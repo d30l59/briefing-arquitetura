@@ -1,15 +1,14 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import requests # Biblioteca para falar com a internet
+import requests
 import json
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Briefing Arquitetônico", page_icon="🏠", layout="centered")
 
-# --- ⚠️ COLOQUE SEU LINK DO SHEETDB AQUI ⚠️ ---
-# Exemplo: "https://sheetdb.io/api/v1/a1b2c3d4e5f6"
-URL_PLANILHA = "https://sheetdb.io/api/v1/v5tluj00urary" 
+# --- SEU LINK DO SHEETDB (JÁ CONFIGURADO) ---
+URL_PLANILHA = "https://sheetdb.io/api/v1/v5tluj00urary"
 
 # --- CONTROLE DE NAVEGAÇÃO ---
 if 'pagina' not in st.session_state:
@@ -112,27 +111,26 @@ else:
         enviar = st.form_submit_button("FINALIZAR E ATUALIZAR PLANILHA ✨")
 
     if enviar:
-        if URL_PLANILHA == "COLE_SEU_LINK_AQUI":
-            st.error("⚠️ ERRO: Você esqueceu de colocar o link do SheetDB no código!")
-        else:
-            # Prepara os dados (Os nomes aqui devem ser IGUAIS aos da Linha 1 do Excel)
-            novo_dado = {
-                "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                "Nome": nome,
-                "Idade": str(idade),
-                "Profissao": profissao,
-                "Usuarios": usuarios,
-                "Estilos": ", ".join(estilos),
-                "Investimento": str(investimento),
-                "Prazo": prazo,
-                "Obs": obs
-            }
-            
-            with st.spinner("Atualizando a planilha no Google..."):
+        # Prepara os dados
+        novo_dado = {
+            "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+            "Nome": nome,
+            "Idade": str(idade),
+            "Profissao": profissao,
+            "Usuarios": usuarios,
+            "Estilos": ", ".join(estilos),
+            "Investimento": str(investimento),
+            "Prazo": prazo,
+            "Obs": obs
+        }
+        
+        with st.spinner("Atualizando a planilha no Google..."):
+            try:
                 sucesso = salvar_no_google_sheets(novo_dado)
-            
-            if sucesso:
-                st.success(f"Sucesso! Os dados de {nome} foram salvos na nuvem.")
-                st.balloons()
-            else:
-                st.error("Houve um erro ao conectar com a planilha. Verifique o link.")
+                if sucesso:
+                    st.success(f"Sucesso! Os dados de {nome} foram salvos na nuvem.")
+                    st.balloons()
+                else:
+                    st.error("Erro ao salvar! Verifique se os nomes das colunas na Planilha Google estão IDÊNTICOS ao código.")
+            except Exception as e:
+                 st.error(f"Erro de conexão: {e}")
