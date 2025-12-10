@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import os
+import io
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Briefing Arquitetônico", page_icon="🏠", layout="centered")
@@ -13,7 +13,19 @@ if 'pagina' not in st.session_state:
 def ir_para_questionario():
     st.session_state['pagina'] = 'questionario'
 
-# --- CSS: ESTILO ROSE GOLD + CAIXAS BRANCAS (SOLICITADO) ---
+# --- FUNÇÃO PARA GERAR EXCEL NA MEMÓRIA (ESSENCIAL PARA ONLINE) ---
+def gerar_excel_bytes(df):
+    output = io.BytesIO()
+    # Usa o motor 'xlsxwriter' que é compatível com o Streamlit Cloud
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Briefing')
+        # Ajuste automático da largura das colunas (opcional, para ficar bonito)
+        worksheet = writer.sheets['Briefing']
+        for i, col in enumerate(df.columns):
+            worksheet.set_column(i, i, 20)
+    return output.getvalue()
+
+# --- CSS: ESTILO ROSE GOLD + CAIXAS BRANCAS ---
 st.markdown("""
 <style>
     /* 1. Fundo Aquarela Rose */
@@ -25,7 +37,7 @@ st.markdown("""
     }
 
     /* 2. Textos em Marrom/Preto */
-    h1, h2, h3, p, label, .stMarkdown {
+    h1, h2, h3, h4, p, label, .stMarkdown, .stRadio label {
         color: #4E342E !important;
     }
 
@@ -37,14 +49,12 @@ st.markdown("""
         border-radius: 8px;
     }
     
-    /* Caixas de Seleção (Dropdowns) */
+    /* Caixas de Seleção e Multiselect */
     div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
         color: #000000 !important;
         border: 1px solid #000000 !important;
     }
-    
-    /* Tags dentro do multiselect */
     .stMultiSelect span {
         color: #000000 !important;
     }
@@ -93,7 +103,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- APP ---
+# --- INÍCIO DO APP ---
 
 if st.session_state['pagina'] == 'capa':
     st.markdown("<br>", unsafe_allow_html=True)
@@ -131,49 +141,39 @@ else:
         obs = st.text_area("Algo mais que precisamos saber?")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        enviar = st.form_submit_button("FINALIZAR E SALVAR ✨")
+        # O botão aqui serve apenas para confirmar o preenchimento
+        enviar = st.form_submit_button("GERAR ARQUIVO EXCEL ✨")
 
     if enviar:
-        # Criação dos Dados
-        dados = {
-            "Data": [datetime.now().strftime("%d/%m/%Y")],
-            "Nome": [nome],
-            "Idade": [idade],
-            "Profissão": [profissao],
-            "Usuários": [usuarios],
-            "Estilos": [", ".join(estilos)],
-            "Rotina": [rotina],
-            "Investimento": [investimento],
-            "Prazo": [prazo],
-            "Observações": [obs]
-        }
-        
-        df = pd.DataFrame(dados)
-        arquivo_excel = "Briefing_Respostas.xlsx"
-        
-        # Salvar (Append se já existir, Criar novo se não)
-        if os.path.exists(arquivo_excel):
-            # Carrega existente e adiciona novo
-            with pd.ExcelWriter(arquivo_excel, mode='a', engine='openpyxl', if_sheet_exists='overlay') as writer:
-                # Tenta ler para saber onde parar, ou apenas concatena
-                try:
-                    df_existente = pd.read_excel(arquivo_excel)
-                    df_final = pd.concat([df_existente, df], ignore_index=True)
-                    df_final.to_excel(arquivo_excel, index=False)
-                except:
-                    df.to_excel(arquivo_excel, index=False)
+        if not nome:
+            st.warning("Por favor, preencha pelo menos o seu Nome.")
         else:
-            df.to_excel(arquivo_excel, index=False)
+            # 1. Cria o DataFrame com os dados
+            dados = {
+                "Data Preenchimento": [datetime.now().strftime("%d/%m/%Y %H:%M")],
+                "Nome Cliente": [nome],
+                "Idade": [idade],
+                "Profissão": [profissao],
+                "Usuários": [usuarios],
+                "Estilos Preferidos": [", ".join(estilos)],
+                "Rotina": [rotina],
+                "Investimento R$": [investimento],
+                "Prazo Limite": [prazo],
+                "Observações": [obs]
+            }
+            df = pd.DataFrame(dados)
             
-        st.success(f"Obrigado, {nome}! Suas respostas foram salvas.")
-        st.balloons()
-        
-        # --- O PULO DO GATO ---
-        # Botão para o cliente baixar o arquivo e te mandar
-        with open(arquivo_excel, "rb") as file:
-            btn = st.download_button(
-                label="📥 CLIQUE AQUI PARA BAIXAR O ARQUIVO (Envie este arquivo para o Arquiteto)",
-                data=file,
-                file_name=f"Briefing_{nome}.xlsx",
+            # 2. Converte para Excel na memória (Bytes)
+            excel_data = gerar_excel_bytes(df)
+            
+            st.success("Briefing gerado com sucesso!")
+            st.markdown("### 👇 Clique abaixo para baixar e enviar para a Arquiteta:")
+            
+            # 3. Botão de Download (Onde a mágica acontece)
+            st.download_button(
+                label="📥 BAIXAR PLANILHA EXCEL",
+                data=excel_data,
+                file_name=f"Briefing_{nome.replace(' ', '_')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+            st.balloons()
