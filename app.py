@@ -1,10 +1,15 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import io
+import requests # Biblioteca para falar com a internet
+import json
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="Briefing Arquitetônico", page_icon="🏠", layout="centered")
+
+# --- ⚠️ COLOQUE SEU LINK DO SHEETDB AQUI ⚠️ ---
+# Exemplo: "https://sheetdb.io/api/v1/a1b2c3d4e5f6"
+URL_PLANILHA = "https://sheetdb.io/api/v1/v5tluj00urary" 
 
 # --- CONTROLE DE NAVEGAÇÃO ---
 if 'pagina' not in st.session_state:
@@ -13,97 +18,64 @@ if 'pagina' not in st.session_state:
 def ir_para_questionario():
     st.session_state['pagina'] = 'questionario'
 
-# --- FUNÇÃO PARA GERAR EXCEL NA MEMÓRIA (ESSENCIAL PARA ONLINE) ---
-def gerar_excel_bytes(df):
-    output = io.BytesIO()
-    # Usa o motor 'xlsxwriter' que é compatível com o Streamlit Cloud
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Briefing')
-        # Ajuste automático da largura das colunas (opcional, para ficar bonito)
-        worksheet = writer.sheets['Briefing']
-        for i, col in enumerate(df.columns):
-            worksheet.set_column(i, i, 20)
-    return output.getvalue()
+# --- FUNÇÃO: ENVIAR PARA O GOOGLE SHEETS ---
+def salvar_no_google_sheets(dados):
+    headers = {'Content-Type': 'application/json'}
+    response = requests.post(URL_PLANILHA, data=json.dumps(dados), headers=headers)
+    return response.status_code == 201
 
-# --- CSS: ESTILO ROSE GOLD + CAIXAS BRANCAS ---
+# --- CSS (ROSE GOLD + CAIXAS BRANCAS) ---
 st.markdown("""
 <style>
-    /* 1. Fundo Aquarela Rose */
+    /* Fundo */
     [data-testid="stAppViewContainer"] {
         background-image: url("https://img.freepik.com/free-photo/pink-watercolor-texture-background_1083-169.jpg");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
     }
-
-    /* 2. Textos em Marrom/Preto */
-    h1, h2, h3, h4, p, label, .stMarkdown, .stRadio label {
-        color: #4E342E !important;
-    }
-
-    /* 3. CAIXAS DE RESPOSTA BRANCAS COM BORDA PRETA */
+    /* Textos */
+    h1, h2, h3, h4, p, label, .stMarkdown { color: #4E342E !important; }
+    
+    /* Inputs Brancos */
     .stTextInput input, .stNumberInput input, .stTextArea textarea, .stDateInput input {
         background-color: #FFFFFF !important;
         color: #000000 !important;
         border: 1px solid #000000 !important;
         border-radius: 8px;
     }
-    
-    /* Caixas de Seleção e Multiselect */
     div[data-baseweb="select"] > div {
         background-color: #FFFFFF !important;
         color: #000000 !important;
         border: 1px solid #000000 !important;
     }
-    .stMultiSelect span {
-        color: #000000 !important;
-    }
+    .stMultiSelect span { color: #000000 !important; }
 
-    /* 4. Estilo da Capa */
+    /* Capa e Botões */
     .titulo-capa {
         font-family: 'Helvetica', sans-serif;
-        color: #880E4F;
-        font-size: 4em;
-        font-weight: 800;
-        text-align: center;
+        color: #880E4F; font-size: 4em; font-weight: 800; text-align: center;
         text-shadow: 2px 2px 4px rgba(255,255,255,0.6);
     }
     .assinatura {
         font-family: 'Brush Script MT', cursive;
-        font-size: 3em;
-        color: #AD1457;
-        text-align: center;
-        margin-top: 10px;
+        font-size: 3em; color: #AD1457; text-align: center; margin-top: 10px;
     }
-
-    /* 5. Container Branco */
     .block-container {
         background-color: rgba(255, 255, 255, 0.92);
-        padding: 3rem;
-        border-radius: 20px;
+        padding: 3rem; border-radius: 20px;
         box-shadow: 0 10px 30px rgba(136, 14, 79, 0.15);
     }
-
-    /* 6. Botões */
     div.stButton > button {
-        background-color: #D81B60;
-        color: white;
-        border: none;
-        padding: 15px 40px;
-        border-radius: 30px;
-        font-size: 18px;
-        font-weight: bold;
-        display: block;
-        margin: 0 auto;
+        background-color: #D81B60; color: white; border: none;
+        padding: 15px 40px; border-radius: 30px; font-size: 18px; font-weight: bold;
+        display: block; margin: 0 auto;
     }
-    div.stButton > button:hover {
-        background-color: #880E4F;
-        transform: scale(1.05);
-    }
+    div.stButton > button:hover { background-color: #880E4F; transform: scale(1.05); }
 </style>
 """, unsafe_allow_html=True)
 
-# --- INÍCIO DO APP ---
+# --- APP ---
 
 if st.session_state['pagina'] == 'capa':
     st.markdown("<br>", unsafe_allow_html=True)
@@ -117,9 +89,8 @@ else:
     st.markdown("<h1 style='text-align: center; color: #880E4F;'>Questionário de Perfil</h1>", unsafe_allow_html=True)
     st.markdown("---")
 
-    with st.form("briefing_completo"):
-        
-        st.markdown("### 1. Informações Gerais")
+    with st.form("briefing_online"):
+        st.markdown("### 1. Dados Básicos")
         col1, col2 = st.columns(2)
         with col1:
             nome = st.text_input("Nome Completo")
@@ -127,53 +98,41 @@ else:
         with col2:
             profissao = st.text_input("Profissão")
         
-        usuarios = st.text_area("Quem utilizará o espaço? (Idades, pets, etc)")
-
-        st.markdown("### 2. Estilo e Preferências")
-        estilos = st.multiselect("Estilo que mais se identifica:", ["Moderno", "Contemporâneo", "Rústico", "Industrial", "Clássico", "Minimalista"])
-        rotina = st.text_area("Como descreveria sua rotina em casa?")
+        usuarios = st.text_area("Quem utilizará o espaço?")
+        
+        st.markdown("### 2. Preferências")
+        estilos = st.multiselect("Estilos preferidos:", ["Moderno", "Clássico", "Industrial", "Rústico", "Minimalista"])
         
         st.markdown("### 3. Orçamento e Prazos")
-        investimento = st.number_input("Investimento Estimado (R$)", min_value=0.0)
-        prazo = st.date_input("Prazo Limite")
-        
-        st.markdown("### Observações Finais")
-        obs = st.text_area("Algo mais que precisamos saber?")
+        investimento = st.number_input("Investimento (R$)", min_value=0.0)
+        prazo = st.date_input("Prazo Limite").strftime("%d/%m/%Y")
+        obs = st.text_area("Observações Finais")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        # O botão aqui serve apenas para confirmar o preenchimento
-        enviar = st.form_submit_button("GERAR ARQUIVO EXCEL ✨")
+        enviar = st.form_submit_button("FINALIZAR E ATUALIZAR PLANILHA ✨")
 
     if enviar:
-        if not nome:
-            st.warning("Por favor, preencha pelo menos o seu Nome.")
+        if URL_PLANILHA == "COLE_SEU_LINK_AQUI":
+            st.error("⚠️ ERRO: Você esqueceu de colocar o link do SheetDB no código!")
         else:
-            # 1. Cria o DataFrame com os dados
-            dados = {
-                "Data Preenchimento": [datetime.now().strftime("%d/%m/%Y %H:%M")],
-                "Nome Cliente": [nome],
-                "Idade": [idade],
-                "Profissão": [profissao],
-                "Usuários": [usuarios],
-                "Estilos Preferidos": [", ".join(estilos)],
-                "Rotina": [rotina],
-                "Investimento R$": [investimento],
-                "Prazo Limite": [prazo],
-                "Observações": [obs]
+            # Prepara os dados (Os nomes aqui devem ser IGUAIS aos da Linha 1 do Excel)
+            novo_dado = {
+                "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "Nome": nome,
+                "Idade": str(idade),
+                "Profissao": profissao,
+                "Usuarios": usuarios,
+                "Estilos": ", ".join(estilos),
+                "Investimento": str(investimento),
+                "Prazo": prazo,
+                "Obs": obs
             }
-            df = pd.DataFrame(dados)
             
-            # 2. Converte para Excel na memória (Bytes)
-            excel_data = gerar_excel_bytes(df)
+            with st.spinner("Atualizando a planilha no Google..."):
+                sucesso = salvar_no_google_sheets(novo_dado)
             
-            st.success("Briefing gerado com sucesso!")
-            st.markdown("### 👇 Clique abaixo para baixar e enviar para a Arquiteta:")
-            
-            # 3. Botão de Download (Onde a mágica acontece)
-            st.download_button(
-                label="📥 BAIXAR PLANILHA EXCEL",
-                data=excel_data,
-                file_name=f"Briefing_{nome.replace(' ', '_')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            st.balloons()
+            if sucesso:
+                st.success(f"Sucesso! Os dados de {nome} foram salvos na nuvem.")
+                st.balloons()
+            else:
+                st.error("Houve um erro ao conectar com a planilha. Verifique o link.")
